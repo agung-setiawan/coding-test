@@ -1,74 +1,135 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from 'react';
+import Layout from '../components/Layout';
+import askAI from "../services/askai";
+import { parseMarkdown } from '../utils/markdownParser';
 
-export default function Home() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
+export default function Dashboard() {
+    const [question, setQuestion] = useState('');
+    const [fullAnswer, setFullAnswer] = useState('');
+    const [displayedAnswer, setDisplayedAnswer] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [typingDone, setTypingDone] = useState(false);
+    const [buttonTitle, setButtonTitle] = useState("Ask");
+    const [disabledTextBox, setDisabledTextBox] = useState(false);
+    const [disabledButton, setDisabledButton] = useState(false);
+    const outputRef = useRef(null);
+    const [spinner, setSpinner] = useState(false);
 
-  useEffect(() => {
-    fetch("http://localhost:8000/api/data")
-      .then((res) => res.json())
-      .then((data) => {
-        setUsers(data.users || []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch data:", err);
-        setLoading(false);
-      });
-  }, []);
+    const handleAsk = async (e) => {
+        e.preventDefault();
+        let parsedText = null;
+        setLoading(true);
+        setTypingDone(false);
+        setDisplayedAnswer('');
+        setFullAnswer('');
+        setDisabledTextBox(true);
+        setDisabledButton(true);
+        setSpinner(true);
 
-  const handleAskQuestion = async () => {
-    try {
-      const response = await fetch("http://localhost:8000/api/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
-      });
-      const data = await response.json();
-      setAnswer(data.answer);
-    } catch (error) {
-      console.error("Error in AI request:", error);
+        try {
+            const res = await askAI({'question' : question})
+            parsedText = parseMarkdown(res.answer)
+            setFullAnswer(parsedText);
+        } catch (err) {
+            setFullAnswer('Error getting response from server.');
+        }
+    };
+
+    useEffect(() => {
+        if (!fullAnswer) return;
+
+        let index = -1;
+        const interval = setInterval(() => {
+            setButtonTitle("Answering...");
+            setDisabledTextBox(true);
+            setDisabledButton(true);
+            setDisplayedAnswer((prev) => prev + fullAnswer.charAt(index));
+            setSpinner(true);
+            setLoading(false);
+
+            index++;
+
+            if (outputRef.current) {
+                const el = outputRef.current;
+                if (el.scrollHeight > el.clientHeight) {
+                    el.scrollTop = el.scrollHeight;
+                }
+            }
+
+            if (index >= fullAnswer.length) {
+                clearInterval(interval);
+                setTypingDone(true);
+                onTypingComplete();
+            }
+
+        }, 30); // Typing speed (ms per char)
+
+        return () => clearInterval(interval);
+    }, [fullAnswer]);
+
+    const onTypingComplete = () => {
+        setSpinner(false);
+        setDisabledTextBox(false);
+        setButtonTitle("Ask");
+        setDisabledButton(false);
+    };
+
+    const onClear = () => {
+        setDisplayedAnswer('');
+        setFullAnswer('');
+        setQuestion('');
+        setTypingDone(false);
     }
-  };
 
-  return (
-    <div style={{ padding: "2rem" }}>
-      <h1>Next.js + FastAPI Sample</h1>
+    return (
+        <Layout>
+            {loading && (
+                <div className="loading-mask">
+                    <div className="spinner-border text-light" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            )}
+            <div className="container mt-5">
+                <h2 className="mb-4">Ask AI a Question</h2>
+                <form onSubmit={handleAsk}>
+                    <div className="mb-3">
+                        <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Type your question..."
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            required
+                            disabled={disabledTextBox}
+                        />
+                    </div>
+                    <button type="submit" className="btn btn-primary" disabled={disabledButton} >
+                        {spinner ? (<span className="spinner-border spinner-border-sm"></span>) : (<span className="bi bi-robot"></span>)}
+                        &nbsp;{buttonTitle}
+                    </button>
+                </form>
 
-      <section style={{ marginBottom: "2rem" }}>
-        <h2>Dummy Data</h2>
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <ul>
-            {users.map((user) => (
-              <li key={user.id}>
-                {user.name} - {user.role}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                <div
+                    ref={outputRef}
+                    className="alert alert-light border p-2 mt-4"
+                    style={{
+                        overflowY: 'scroll',
+                        minHeight: '400px',
+                        maxHeight: '400px'
+                    }}
+                >
+                    {displayedAnswer && (
+                        <div dangerouslySetInnerHTML={{ __html: displayedAnswer }}></div>
+                    )}
+                </div>
 
-      <section>
-        <h2>Ask a Question (AI Endpoint)</h2>
-        <div>
-          <input
-            type="text"
-            placeholder="Enter your question..."
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-          />
-          <button onClick={handleAskQuestion}>Ask</button>
-        </div>
-        {answer && (
-          <div style={{ marginTop: "1rem" }}>
-            <strong>AI Response:</strong> {answer}
-          </div>
-        )}
-      </section>
-    </div>
-  );
+                {typingDone && (
+                    <div className="col-md-12 text-right">
+                        <button className="btn btn-success" onClick={onClear}>Clear...</button>
+                    </div>
+                )}
+            </div>
+        </Layout>
+    );
 }
