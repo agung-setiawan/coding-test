@@ -1,0 +1,35 @@
+# Distribution / packaging
+./backend/.Python
+./backend/build/
+./backend/develop-eggs/
+./backend/dist/
+./backend/downloads/
+./backend/eggs/
+./backend/.eggs/
+./backend/lib/
+./backend/lib64/
+./backend/parts/
+./backend/sdist/
+./backend/var/
+./backend/wheels/
+./backend/share/python-wheels/
+./backend/*.egg-info/
+./backend/.installed.cfg
+./backend/*.egg
+
+# Environments
+./backend/.env
+./backend/.venv
+./backend/env/
+./backend/venv/
+./backend/ENV/
+./backend/env.bak/
+./backend/venv.bak/
+
+./backend/.idea/
+
+./frontend/.idea/
+./frontend/node_modules/
+./frontend/.next/
+./frontend/.swc/
+./frontend/.*.env
